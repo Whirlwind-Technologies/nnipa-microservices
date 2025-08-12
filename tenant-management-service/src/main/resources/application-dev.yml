@@ -1,0 +1,55 @@
+# Development Profile Configuration
+spring:
+  # Database Configuration for Development
+  datasource:
+    url: jdbc:postgresql://localhost:5432/tenant_db
+    username: tenant_user  # Switch back to tenant_user after migrations
+    password: tenant_pass
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-test-query: SELECT 1
+      connection-timeout: 30000
+
+  # JPA Development Settings
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        generate_statistics: true
+
+  # Development Cache Settings
+  cache:
+    caffeine:
+      spec: maximumSize=100,expireAfterWrite=1m
+
+# Server Configuration for Development
+server:
+  port: 8081
+  error:
+    include-stacktrace: always
+
+# Logging for Development
+logging:
+  level:
+    com.nnipa.tenant: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.data.jpa: DEBUG
+
+# Development-specific Application Properties
+app:
+  tenant:
+    development-mode: true
+    mock-external-services: true
+
+# Actuator - All endpoints exposed in dev
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always

@@ -1,0 +1,39 @@
+# Test Profile Configuration
+spring:
+  # Use H2 in-memory database for tests
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  # JPA Test Settings
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+
+  # Flyway disabled for tests
+  flyway:
+    enabled: false
+
+  # Cache disabled for tests
+  cache:
+    type: none
+
+# Logging for tests
+logging:
+  level:
+    com.nnipa.tenant: DEBUG
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+
+# Test-specific settings
+app:
+  tenant:
+    development-mode: true
+    mock-external-services: true
