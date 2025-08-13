@@ -4,6 +4,7 @@ import com.nnipa.tenant.enums.SubscriptionPlan;
 import com.nnipa.tenant.enums.TenantStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
@@ -24,7 +25,7 @@ import java.util.Set;
                 @Index(name = "idx_tenant_created", columnList = "created_at")
         })
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
