@@ -9,6 +9,7 @@ import com.nnipa.tenant.entity.TenantAddress;
 import com.nnipa.tenant.entity.TenantFeature;
 import com.nnipa.tenant.enums.FeatureFlag;
 import org.mapstruct.*;
+import org.hibernate.Hibernate;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -142,7 +143,7 @@ public interface TenantMapper {
 
         try {
             // Check if the collection is initialized
-            if (!org.hibernate.Hibernate.isInitialized(features)) {
+            if (!Hibernate.isInitialized(features)) {
                 // Return empty set if not initialized to avoid LazyInitializationException
                 return Set.of();
             }

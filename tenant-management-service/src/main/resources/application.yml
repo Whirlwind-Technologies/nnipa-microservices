@@ -151,7 +151,7 @@ logging:
 springdoc:
   api-docs:
     enabled: true
-    path: /api-docs
+    path: /v3/api-docs
   swagger-ui:
     enabled: true
     path: /swagger-ui.html
@@ -159,7 +159,10 @@ springdoc:
     filter: true
     operations-sorter: method
     tags-sorter: alpha
-  show-actuator: true
+    disable-swagger-default-url: true
+  show-actuator: false
+  packages-to-scan: com.nnipa.tenant.controller
+  paths-to-match: /**
 
 # Application Custom Properties
 app:

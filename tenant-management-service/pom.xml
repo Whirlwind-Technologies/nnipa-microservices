@@ -28,7 +28,7 @@
         <!-- Core Dependencies Versions -->
         <lombok.version>1.18.34</lombok.version>
         <mapstruct.version>1.6.2</mapstruct.version>
-        <springdoc.version>2.6.0</springdoc.version>
+        <springdoc.version>2.7.0</springdoc.version>
 
         <!-- Database Versions -->
         <postgresql.version>42.7.4</postgresql.version>
@@ -205,6 +205,11 @@
                 <version>2.2.224</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok-mapstruct-binding</artifactId>
+                <version>0.2.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -231,19 +236,16 @@
                     <source>21</source>
                     <target>21</target>
                     <annotationProcessorPaths>
-                        <!-- Order matters: Lombok MUST come first -->
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>${lombok.version}</version>
-                        </path>
-                        <!-- MapStruct processor comes after Lombok -->
                         <path>
                             <groupId>org.mapstruct</groupId>
                             <artifactId>mapstruct-processor</artifactId>
                             <version>${mapstruct.version}</version>
                         </path>
-                        <!-- Add the lombok-mapstruct-binding to make them work together -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok-mapstruct-binding</artifactId>
