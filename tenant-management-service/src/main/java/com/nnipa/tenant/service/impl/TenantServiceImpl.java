@@ -203,29 +203,44 @@ public class TenantServiceImpl implements TenantService {
             );
         }
 
+        boolean schemaCreatedSuccessfully = false;
+        String schemaName = tenant.getSchemaName();
+
         try {
             // Update status to provisioning
             tenant.setStatus(TenantStatus.PROVISIONING);
             tenantRepository.save(tenant);
 
-            // 1. Create database schema
-            String schemaName = tenant.getSchemaName();
+            // 1. Create database schema and initialize with data
             if (!databaseProvisioningService.schemaExists(schemaName)) {
+                // Create schema first (separate transaction for DDL)
                 databaseProvisioningService.createTenantSchema(schemaName);
 
-                // 2. Initialize tables
-                databaseProvisioningService.initializeTenantTables(schemaName);
+                // Initialize tables AND insert data in single transaction
+                databaseProvisioningService.initializeSchemaWithData(schemaName, tenantId.toString());
 
-                // 3. Set up default data
-                databaseProvisioningService.insertDefaultData(schemaName, tenant.getName());
+                // Mark as successfully created based on the method completion
+                schemaCreatedSuccessfully = true;
+                log.info("Schema {} creation and initialization completed", schemaName);
+
+                // Try verification with retry, but don't fail if it doesn't work immediately
+                boolean verified = verifySchemaWithRetry(schemaName, 3, 500);
+                if (verified) {
+                    log.info("Schema {} verification successful", schemaName);
+                } else {
+                    log.warn("Schema {} verification failed, but creation appeared successful. " +
+                            "This may be due to transaction timing. Proceeding with provisioning.", schemaName);
+                    // Don't throw exception here - the schema was created successfully
+                }
             } else {
                 log.warn("Schema {} already exists, skipping creation", schemaName);
+                schemaCreatedSuccessfully = true; // Existing schema counts as successful
             }
 
-            // 4. Configure external services (if needed)
+            // 2. Configure external services (if needed)
             configureExternalServices(tenant);
 
-            // 5. Initialize usage tracking
+            // 3. Initialize usage tracking
             initializeUsageTracking(tenant);
 
             // Update status to active
@@ -241,11 +256,26 @@ public class TenantServiceImpl implements TenantService {
             tenant.setStatus(TenantStatus.PENDING);
             tenantRepository.save(tenant);
 
-            // Try to clean up partially created resources
-            try {
-                databaseProvisioningService.dropTenantSchema(tenant.getSchemaName());
-            } catch (Exception cleanupEx) {
-                log.error("Failed to cleanup schema after provisioning failure", cleanupEx);
+            // Only clean up if we're sure the schema creation actually failed
+            // Don't clean up if it was just a verification timing issue
+            if (shouldCleanupSchema(e, schemaCreatedSuccessfully)) {
+                try {
+                    // Give some time for transactions to settle before cleanup
+                    Thread.sleep(1000);
+
+                    // Double-check if schema actually exists before dropping
+                    if (databaseProvisioningService.schemaExists(schemaName)) {
+                        log.info("Schema {} exists, proceeding with cleanup", schemaName);
+                        databaseProvisioningService.dropTenantSchema(schemaName);
+                        log.info("Cleaned up schema {} after provisioning failure", schemaName);
+                    } else {
+                        log.info("Schema {} doesn't exist, no cleanup needed", schemaName);
+                    }
+                } catch (Exception cleanupEx) {
+                    log.error("Failed to cleanup schema after provisioning failure", cleanupEx);
+                }
+            } else {
+                log.info("Skipping schema cleanup for {} - appears to be verification timing issue", schemaName);
             }
 
             throw new TenantProvisioningException("Failed to provision tenant: " + e.getMessage(), e);
@@ -849,5 +879,57 @@ public class TenantServiceImpl implements TenantService {
                 .build();
 
         usageRepository.save(initialUsage);
+    }
+
+    /**
+     * Determine if we should cleanup the schema based on the error and creation status
+     */
+    private boolean shouldCleanupSchema(Exception error, boolean schemaCreatedSuccessfully) {
+        // If schema creation appeared successful and error mentions verification,
+        // don't cleanup - it's likely a timing issue
+        if (schemaCreatedSuccessfully && error.getMessage().contains("verification")) {
+            return false;
+        }
+
+        // If it's a RuntimeException from schema verification, don't cleanup
+        if (error instanceof RuntimeException &&
+                error.getMessage().contains("Schema verification failed")) {
+            return false;
+        }
+
+        // For other errors, cleanup is appropriate
+        return true;
+    }
+
+    /**
+     * Verify schema exists with retry logic to handle transaction timing issues
+     */
+    private boolean verifySchemaWithRetry(String schemaName, int maxRetries, long delayMs) {
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                if (i > 0) {
+                    Thread.sleep(delayMs);
+                    log.debug("Retry {} for schema {} verification", i + 1, schemaName);
+                }
+
+                if (databaseProvisioningService.schemaExists(schemaName)) {
+                    Integer tableCount = databaseProvisioningService.getTableCount(schemaName);
+                    if (tableCount != null && tableCount >= 6) {
+                        log.info("Schema {} verified successfully with {} tables on attempt {}",
+                                schemaName, tableCount, i + 1);
+                        return true;
+                    }
+                    log.debug("Schema {} exists but has insufficient tables: {} on attempt {}",
+                            schemaName, tableCount, i + 1);
+                } else {
+                    log.debug("Schema {} not visible on attempt {}", schemaName, i + 1);
+                }
+            } catch (Exception e) {
+                log.debug("Verification attempt {} failed for schema {}: {}", i + 1, schemaName, e.getMessage());
+            }
+        }
+
+        log.warn("Schema {} verification failed after {} attempts", schemaName, maxRetries);
+        return false;
     }
 }

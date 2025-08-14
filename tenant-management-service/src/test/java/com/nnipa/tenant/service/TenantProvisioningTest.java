@@ -19,7 +19,11 @@ import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Integration tests for tenant provisioning functionality
+ * Integration tests for tenant provisioning functionality.
+ * Tests the creation of tenant schemas and core business tables.
+ *
+ * NOTE: User-related tables are NOT created here - they are managed
+ * by the User Management Service in a microservices architecture.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -73,37 +77,52 @@ class TenantProvisioningTest {
         // Verify schema exists
         assertTrue(databaseProvisioningService.schemaExists(provisioned.getSchemaName()));
 
-        // Verify tables created
+        // Verify tables created (should be at least 6 core tables)
         Integer tableCount = databaseProvisioningService.getTableCount(provisioned.getSchemaName());
-        assertTrue(tableCount > 0);
+        assertTrue(tableCount >= 6, "Should have at least 6 core tables");
 
         // Verify default data inserted
         String schema = provisioned.getSchemaName();
         tenantContextService.executeWithTenantJdbc(schema, jdbc -> {
-            // Check users table
-            Integer userCount = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM users", Integer.class
-            );
-            assertTrue(userCount > 0);
+            // NOTE: We do NOT check for users table - that's User Management Service responsibility
 
-            // Check dashboards table
+            // Check dashboards table with default dashboard
             Integer dashboardCount = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM dashboards", Integer.class
             );
-            assertTrue(dashboardCount > 0);
+            assertTrue(dashboardCount > 0, "Should have at least one default dashboard");
 
-            // Check datasets table
+            // Check datasets table exists (may be empty initially)
             Integer datasetCount = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM datasets", Integer.class
             );
-            assertTrue(datasetCount > 0);
+            assertNotNull(datasetCount, "Datasets table should exist");
+            // Note: datasets may be 0 initially if no default data is inserted
 
-            // Check audit logs
+            // Check surveys table exists (may be empty initially)
+            Integer surveyCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM surveys", Integer.class
+            );
+            assertNotNull(surveyCount, "Surveys table should exist");
+
+            // Check models table exists (may be empty initially)
+            Integer modelCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM models", Integer.class
+            );
+            assertNotNull(modelCount, "Models table should exist");
+
+            // Check tenant_settings table with default settings
+            Integer settingsCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM tenant_settings", Integer.class
+            );
+            assertTrue(settingsCount > 0, "Should have default tenant settings");
+
+            // Check audit logs for provisioning event
             Integer auditCount = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM audit_logs WHERE action = 'TENANT_PROVISIONED'",
                     Integer.class
             );
-            assertTrue(auditCount > 0);
+            assertTrue(auditCount > 0, "Should have tenant provisioning audit log");
 
             return null;
         });
@@ -218,8 +237,8 @@ class TenantProvisioningTest {
                     "SELECT name FROM datasets"
             );
 
-            // Should have 2 datasets (1 default + 1 we inserted)
-            assertEquals(2, datasets.size());
+            // Should have 1 dataset (the one we inserted - no default datasets)
+            assertEquals(1, datasets.size());
 
             // Verify we only see tenant1's data
             boolean hasTenant1Data = datasets.stream()
@@ -239,8 +258,8 @@ class TenantProvisioningTest {
                     "SELECT name FROM datasets"
             );
 
-            // Should have 2 datasets (1 default + 1 we inserted)
-            assertEquals(2, datasets.size());
+            // Should have 1 dataset (the one we inserted - no default datasets)
+            assertEquals(1, datasets.size());
 
             // Verify we only see tenant2's data
             boolean hasTenant1Data = datasets.stream()
@@ -250,6 +269,66 @@ class TenantProvisioningTest {
 
             assertFalse(hasTenant1Data); // Should NOT see tenant1's data
             assertTrue(hasTenant2Data);
+
+            return null;
+        });
+    }
+
+    @Test
+    void testCoreBusinessTables() {
+        // Create and provision tenant
+        Tenant tenant = tenantService.createTenant(testTenant);
+        tenantService.provisionTenant(tenant.getId());
+
+        // Verify all core business tables exist
+        tenantContextService.executeWithTenantJdbc(tenant.getSchemaName(), jdbc -> {
+            // Check datasets table structure
+            List<Map<String, Object>> datasetColumns = jdbc.queryForList(
+                    "SELECT column_name FROM information_schema.columns " +
+                            "WHERE table_schema = ? AND table_name = 'datasets'",
+                    tenant.getSchemaName()
+            );
+            assertFalse(datasetColumns.isEmpty(), "Datasets table should have columns");
+
+            // Check surveys table structure
+            List<Map<String, Object>> surveyColumns = jdbc.queryForList(
+                    "SELECT column_name FROM information_schema.columns " +
+                            "WHERE table_schema = ? AND table_name = 'surveys'",
+                    tenant.getSchemaName()
+            );
+            assertFalse(surveyColumns.isEmpty(), "Surveys table should have columns");
+
+            // Check models table structure
+            List<Map<String, Object>> modelColumns = jdbc.queryForList(
+                    "SELECT column_name FROM information_schema.columns " +
+                            "WHERE table_schema = ? AND table_name = 'models'",
+                    tenant.getSchemaName()
+            );
+            assertFalse(modelColumns.isEmpty(), "Models table should have columns");
+
+            // Check dashboards table structure
+            List<Map<String, Object>> dashboardColumns = jdbc.queryForList(
+                    "SELECT column_name FROM information_schema.columns " +
+                            "WHERE table_schema = ? AND table_name = 'dashboards'",
+                    tenant.getSchemaName()
+            );
+            assertFalse(dashboardColumns.isEmpty(), "Dashboards table should have columns");
+
+            // Check audit_logs table structure
+            List<Map<String, Object>> auditColumns = jdbc.queryForList(
+                    "SELECT column_name FROM information_schema.columns " +
+                            "WHERE table_schema = ? AND table_name = 'audit_logs'",
+                    tenant.getSchemaName()
+            );
+            assertFalse(auditColumns.isEmpty(), "Audit logs table should have columns");
+
+            // Check tenant_settings table structure
+            List<Map<String, Object>> settingsColumns = jdbc.queryForList(
+                    "SELECT column_name FROM information_schema.columns " +
+                            "WHERE table_schema = ? AND table_name = 'tenant_settings'",
+                    tenant.getSchemaName()
+            );
+            assertFalse(settingsColumns.isEmpty(), "Tenant settings table should have columns");
 
             return null;
         });
@@ -310,5 +389,40 @@ class TenantProvisioningTest {
 
         // Verify schema still exists (archived, not deleted)
         assertTrue(databaseProvisioningService.schemaExists(archived.getSchemaName()));
+    }
+
+    @Test
+    void testDefaultDataProvisioning() {
+        // Create and provision tenant
+        Tenant tenant = tenantService.createTenant(testTenant);
+        tenantService.provisionTenant(tenant.getId());
+
+        tenantContextService.executeWithTenantJdbc(tenant.getSchemaName(), jdbc -> {
+            // Verify default dashboard was created
+            List<Map<String, Object>> dashboards = jdbc.queryForList(
+                    "SELECT name, description, type FROM dashboards WHERE name = 'Welcome Dashboard'"
+            );
+            assertEquals(1, dashboards.size(), "Should have default welcome dashboard");
+
+            // Verify default settings were created
+            List<Map<String, Object>> settings = jdbc.queryForList(
+                    "SELECT key, value FROM tenant_settings ORDER BY key"
+            );
+            assertTrue(settings.size() >= 5, "Should have at least 5 default settings");
+
+            // Check specific default settings
+            boolean hasDateFormat = settings.stream()
+                    .anyMatch(s -> "date_format".equals(s.get("key")));
+            boolean hasTimezone = settings.stream()
+                    .anyMatch(s -> "time_zone".equals(s.get("key")));
+            boolean hasLanguage = settings.stream()
+                    .anyMatch(s -> "language".equals(s.get("key")));
+
+            assertTrue(hasDateFormat, "Should have date_format setting");
+            assertTrue(hasTimezone, "Should have time_zone setting");
+            assertTrue(hasLanguage, "Should have language setting");
+
+            return null;
+        });
     }
 }
