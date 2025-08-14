@@ -11,6 +11,9 @@ import com.nnipa.tenant.enums.FeatureFlag;
 import org.mapstruct.*;
 import org.hibernate.Hibernate;
 
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -135,27 +138,44 @@ public interface TenantMapper {
 
     /**
      * Map enabled features from TenantFeature entities
+     * Updated to return List<String> and handle features loaded by service
      */
-    default Set<String> mapEnabledFeatures(Set<TenantFeature> features) {
+    default List<String> mapEnabledFeatures(Set<TenantFeature> features) {
         if (features == null) {
-            return Set.of();
+            return Collections.emptyList();
         }
 
         try {
             // Check if the collection is initialized
             if (!Hibernate.isInitialized(features)) {
-                // Return empty set if not initialized to avoid LazyInitializationException
-                return Set.of();
+                // Return empty list if not initialized to avoid LazyInitializationException
+                return Collections.emptyList();
             }
 
             return features.stream()
-                    .filter(TenantFeature::isActive)
+                    .filter(tf -> {
+                        // Additional safety checks since features are now explicitly loaded
+                        if (tf == null || tf.getFeature() == null) return false;
+
+                        // Check if feature is enabled and not deleted
+                        if (tf.getEnabled() == null || !tf.getEnabled() || tf.getDeletedAt() != null) {
+                            return false;
+                        }
+
+                        // Check if feature is not expired
+                        if (tf.getExpiresAt() != null && tf.getExpiresAt().isBefore(Instant.now())) {
+                            return false;
+                        }
+
+                        return true;
+                    })
                     .map(TenantFeature::getFeature)
                     .map(FeatureFlag::name)
-                    .collect(Collectors.toSet());
+                    .sorted() // Sort alphabetically for consistent output
+                    .collect(Collectors.toList());
         } catch (Exception e) {
-            // If any exception occurs (including LazyInitializationException), return empty set
-            return Set.of();
+            // If any exception occurs (including LazyInitializationException), return empty list
+            return Collections.emptyList();
         }
     }
 }

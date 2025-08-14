@@ -9,6 +9,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -89,7 +91,7 @@ public class TenantResponse {
     private Boolean isActive;
 
     @Schema(description = "Enabled features for this tenant")
-    private Set<String> enabledFeatures;
+    private List<String> enabledFeatures = new ArrayList<>();
 
     @Schema(description = "Creation timestamp")
     private Instant createdAt;

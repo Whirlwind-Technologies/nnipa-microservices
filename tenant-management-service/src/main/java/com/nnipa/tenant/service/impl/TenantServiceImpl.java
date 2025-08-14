@@ -93,16 +93,24 @@ public class TenantServiceImpl implements TenantService {
     @Cacheable(value = "tenants", key = "#tenantId")
     public Tenant getTenantById(UUID tenantId) {
         log.debug("Fetching tenant with ID: {}", tenantId);
-        return tenantRepository.findById(tenantId)
+        Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new TenantNotFoundException(tenantId.toString()));
+
+        loadTenantFeatures(tenant);
+
+        return tenant;
     }
 
     @Override
     @Cacheable(value = "tenants", key = "#subdomain")
     public Tenant getTenantBySubdomain(String subdomain) {
         log.debug("Fetching tenant with subdomain: {}", subdomain);
-        return tenantRepository.findBySubdomain(subdomain)
+        Tenant tenant = tenantRepository.findBySubdomain(subdomain)
                 .orElseThrow(() -> new TenantNotFoundException(subdomain));
+
+        loadTenantFeatures(tenant);
+
+        return tenant;
     }
 
     @Override
@@ -173,13 +181,23 @@ public class TenantServiceImpl implements TenantService {
     @Override
     public Page<Tenant> searchTenants(String searchTerm, Pageable pageable) {
         log.debug("Searching tenants with term: {}", searchTerm);
-        return tenantRepository.searchTenants(searchTerm, pageable);
+        Page<Tenant> tenants = tenantRepository.searchTenants(searchTerm, pageable);
+
+        // Load features for each tenant
+        tenants.getContent().forEach(this::loadTenantFeatures);
+
+        return tenants;
     }
 
     @Override
     public Page<Tenant> getAllTenants(Pageable pageable) {
         log.debug("Fetching all tenants with pagination");
-        return tenantRepository.findAll(pageable);
+        Page<Tenant> tenants = tenantRepository.findAll(pageable);
+
+        // Load features for each tenant
+        tenants.getContent().forEach(this::loadTenantFeatures);
+
+        return tenants;
     }
 
     @Override
@@ -931,5 +949,16 @@ public class TenantServiceImpl implements TenantService {
 
         log.warn("Schema {} verification failed after {} attempts", schemaName, maxRetries);
         return false;
+    }
+
+    /**
+     * Load active features for a tenant and set them on the features collection
+     */
+    private void loadTenantFeatures(Tenant tenant) {
+        List<TenantFeature> activeFeatures = featureRepository
+                .findActiveFeaturesByTenantId(tenant.getId(), Instant.now());
+
+        // Convert List to Set and set it on the tenant
+        tenant.setFeatures(new HashSet<>(activeFeatures));
     }
 }
