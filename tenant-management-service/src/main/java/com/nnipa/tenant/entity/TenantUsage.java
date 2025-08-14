@@ -1,7 +1,9 @@
 package com.nnipa.tenant.entity;
 
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Type;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -77,6 +79,7 @@ public class TenantUsage extends BaseEntity {
     private String billingPeriod; // HOURLY, DAILY, MONTHLY
 
     @Column(name = "metadata", columnDefinition = "jsonb")
+    @Type(JsonType.class)
     private String metadata;
 
     @Column(name = "recorded_at", nullable = false)

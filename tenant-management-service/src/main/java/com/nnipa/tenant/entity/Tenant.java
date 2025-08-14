@@ -2,10 +2,14 @@ package com.nnipa.tenant.entity;
 
 import com.nnipa.tenant.enums.SubscriptionPlan;
 import com.nnipa.tenant.enums.TenantStatus;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -114,9 +118,11 @@ public class Tenant extends BaseEntity {
 
     // Metadata
     @Column(name = "metadata", columnDefinition = "jsonb")
+    @Type(JsonType.class)
     private String metadata;
 
     @Column(name = "tags", columnDefinition = "jsonb")
+    @Type(JsonType.class)
     private String tags;
 
     // Relationships

@@ -61,7 +61,10 @@ public class DatabaseProvisioningService {
              Statement statement = connection.createStatement()) {
 
             // Set search path to tenant schema
-            statement.execute(String.format("SET search_path TO %s", schemaName));
+            statement.execute(String.format("SET search_path TO %s, public", schemaName));
+
+            // Enable UUID extension in the schema
+            statement.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"");
 
             // Create datasets table
             String createDatasetsTable = """

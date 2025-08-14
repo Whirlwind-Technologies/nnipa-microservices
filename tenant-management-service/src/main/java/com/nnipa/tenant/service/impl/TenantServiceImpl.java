@@ -531,6 +531,8 @@ public class TenantServiceImpl implements TenantService {
                     .tenant(tenant)
                     .configKey(key)
                     .configValue(value)
+                    .isEncrypted(false)
+                    .isSensitive(false)
                     .build();
         }
 

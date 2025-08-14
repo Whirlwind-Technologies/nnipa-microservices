@@ -1,7 +1,9 @@
 package com.nnipa.tenant.entity;
 
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Type;
 
 /**
  * Entity representing configuration settings for a specific tenant.
@@ -54,6 +56,7 @@ public class TenantConfiguration extends BaseEntity {
     private String defaultValue;
 
     @Column(name = "validation_rules", columnDefinition = "jsonb")
+    @Type(JsonType.class)
     private String validationRules;
 
     /**

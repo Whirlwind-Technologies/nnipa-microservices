@@ -1,8 +1,10 @@
 package com.nnipa.tenant.entity;
 
 import com.nnipa.tenant.enums.SubscriptionPlan;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Type;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -87,6 +89,7 @@ public class TenantSubscription extends BaseEntity {
     private String notes;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
+    @Type(JsonType.class)
     private String metadata;
 
     /**

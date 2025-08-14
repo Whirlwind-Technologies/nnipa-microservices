@@ -1,8 +1,10 @@
 package com.nnipa.tenant.entity;
 
 import com.nnipa.tenant.enums.FeatureFlag;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Type;
 
 import java.time.Instant;
 
@@ -43,6 +45,7 @@ public class TenantFeature extends BaseEntity {
     private Instant expiresAt;
 
     @Column(name = "configuration", columnDefinition = "jsonb")
+    @Type(JsonType.class)
     private String configuration;
 
     @Column(name = "notes", columnDefinition = "TEXT")
